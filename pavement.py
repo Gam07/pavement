@@ -9,7 +9,6 @@ Date: 2026
 import streamlit as st
 import numpy as np
 import pandas as pd
-from scipy.optimize import fsolve
 import math
 
 # Try to import plotly, but make it optional
@@ -60,11 +59,47 @@ def calculate_sn_from_aashto(W18, ZR, So, delta_psi, MR):
         
         return term1 + term2 + term3 + term4 + term5 + term6 - np.log10(W18)
     
-    # แก้สมการหา SN
-    SN_initial_guess = 3.0
-    SN_solution = fsolve(aashto_equation, SN_initial_guess)[0]
+    def aashto_derivative(SN):
+        """
+        อนุพันธ์ของสมการ AASHTO สำหรับ Newton-Raphson
+        """
+        term1 = 9.36 / ((SN + 1) * np.log(10))
+        
+        numerator = np.log10(delta_psi / (4.2 - 1.5))
+        denominator = 0.40 + (1094 / ((SN + 1) ** 5.19))
+        
+        # d/dSN of denominator
+        d_denominator = -(1094 * 5.19 * ((SN + 1) ** -6.19))
+        
+        # Chain rule for term4
+        term2 = -numerator * d_denominator / (denominator ** 2)
+        
+        return term1 + term2
     
-    return max(SN_solution, 0)
+    # Newton-Raphson method
+    SN = 3.0  # Initial guess
+    tolerance = 1e-6
+    max_iterations = 100
+    
+    for i in range(max_iterations):
+        f_SN = aashto_equation(SN)
+        f_prime_SN = aashto_derivative(SN)
+        
+        # Newton-Raphson update
+        SN_new = SN - f_SN / f_prime_SN
+        
+        # Check convergence
+        if abs(SN_new - SN) < tolerance:
+            return max(SN_new, 0)
+        
+        SN = SN_new
+        
+        # Ensure SN stays positive
+        if SN < 0:
+            SN = 0.1
+    
+    # If didn't converge, return current value
+    return max(SN, 0)
 
 
 def get_layer_coefficient(material_type, material_property):
