@@ -9,10 +9,17 @@ Date: 2026
 import streamlit as st
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 from scipy.optimize import fsolve
 import math
+
+# Try to import plotly, but make it optional
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.warning("⚠️ Plotly not installed. Some visualizations will be limited. Install with: pip install plotly")
 
 # ================================
 # ฟังก์ชันคำนวณหลัก
@@ -331,50 +338,66 @@ def main():
             # Visualization - Layer thickness diagram
             st.subheader("📐 Pavement Cross-Section")
             
-            fig_section = go.Figure()
-            
-            # วาดแต่ละชั้น
-            y_top = 0
-            colors = ['#2C3E50', '#95A5A6', '#BDC3C7']
-            labels = [f'AC: {D1:.1f}" ({D1*2.54:.1f} cm)',
-                     f'Base: {D2:.1f}" ({D2*2.54:.1f} cm)',
-                     f'Subbase: {D3:.1f}" ({D3*2.54:.1f} cm)']
-            thicknesses = [D1, D2, D3]
-            
-            for i, (thickness, color, label) in enumerate(zip(thicknesses, colors, labels)):
-                if thickness > 0:
-                    fig_section.add_trace(go.Bar(
-                        y=[label],
-                        x=[thickness],
-                        orientation='h',
-                        marker=dict(color=color),
-                        text=f"{thickness:.1f}\"",
-                        textposition='inside',
-                        name=label
-                    ))
-            
-            fig_section.update_layout(
-                title="Pavement Layer Thickness",
-                xaxis_title="Thickness (inches)",
-                barmode='stack',
-                showlegend=False,
-                height=300
-            )
-            
-            st.plotly_chart(fig_section, use_container_width=True)
+            if PLOTLY_AVAILABLE:
+                fig_section = go.Figure()
+                
+                # วาดแต่ละชั้น
+                y_top = 0
+                colors = ['#2C3E50', '#95A5A6', '#BDC3C7']
+                labels = [f'AC: {D1:.1f}" ({D1*2.54:.1f} cm)',
+                         f'Base: {D2:.1f}" ({D2*2.54:.1f} cm)',
+                         f'Subbase: {D3:.1f}" ({D3*2.54:.1f} cm)']
+                thicknesses = [D1, D2, D3]
+                
+                for i, (thickness, color, label) in enumerate(zip(thicknesses, colors, labels)):
+                    if thickness > 0:
+                        fig_section.add_trace(go.Bar(
+                            y=[label],
+                            x=[thickness],
+                            orientation='h',
+                            marker=dict(color=color),
+                            text=f"{thickness:.1f}\"",
+                            textposition='inside',
+                            name=label
+                        ))
+                
+                fig_section.update_layout(
+                    title="Pavement Layer Thickness",
+                    xaxis_title="Thickness (inches)",
+                    barmode='stack',
+                    showlegend=False,
+                    height=300
+                )
+                
+                st.plotly_chart(fig_section, use_container_width=True)
+            else:
+                # Simple bar chart alternative using streamlit
+                st.bar_chart({
+                    'Asphalt': D1,
+                    'Base': D2,
+                    'Subbase': D3
+                })
             
             # SN Contribution Pie Chart
             st.subheader("🥧 SN Contribution by Layer")
             
-            fig_pie = go.Figure(data=[go.Pie(
-                labels=['Asphalt', 'Base', 'Subbase'],
-                values=[SN1, SN2, SN3],
-                hole=0.3,
-                marker=dict(colors=['#2C3E50', '#95A5A6', '#BDC3C7'])
-            )])
-            
-            fig_pie.update_layout(height=400)
-            st.plotly_chart(fig_pie, use_container_width=True)
+            if PLOTLY_AVAILABLE:
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=['Asphalt', 'Base', 'Subbase'],
+                    values=[SN1, SN2, SN3],
+                    hole=0.3,
+                    marker=dict(colors=['#2C3E50', '#95A5A6', '#BDC3C7'])
+                )])
+                
+                fig_pie.update_layout(height=400)
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                # Alternative visualization
+                contrib_df = pd.DataFrame({
+                    'Layer': ['Asphalt', 'Base', 'Subbase'],
+                    'SN Contribution': [SN1, SN2, SN3]
+                })
+                st.bar_chart(contrib_df.set_index('Layer'))
             
         except Exception as e:
             st.error(f"Error in calculation: {str(e)}")
@@ -492,57 +515,78 @@ Generated by AASHTO 1993 Pavement Design Calculator
         W18_range = np.logspace(np.log10(W18*0.5), np.log10(W18*2), 20)
         SN_values = [calculate_sn_from_aashto(w, ZR, So, delta_psi, MR) for w in W18_range]
         
-        fig_sens = go.Figure()
-        fig_sens.add_trace(go.Scatter(
-            x=W18_range,
-            y=SN_values,
-            mode='lines+markers',
-            name='SN vs W18'
-        ))
-        fig_sens.update_layout(
-            title="Sensitivity: SN vs W18",
-            xaxis_title="W18 (ESAL)",
-            yaxis_title="Structural Number (SN)",
-            xaxis_type="log"
-        )
-        st.plotly_chart(fig_sens, use_container_width=True)
+        if PLOTLY_AVAILABLE:
+            fig_sens = go.Figure()
+            fig_sens.add_trace(go.Scatter(
+                x=W18_range,
+                y=SN_values,
+                mode='lines+markers',
+                name='SN vs W18'
+            ))
+            fig_sens.update_layout(
+                title="Sensitivity: SN vs W18",
+                xaxis_title="W18 (ESAL)",
+                yaxis_title="Structural Number (SN)",
+                xaxis_type="log"
+            )
+            st.plotly_chart(fig_sens, use_container_width=True)
+        else:
+            sens_df = pd.DataFrame({
+                'W18': W18_range,
+                'SN': SN_values
+            })
+            st.line_chart(sens_df.set_index('W18'))
         
     elif sensitivity_param == "MR":
         MR_range = np.linspace(MR*0.5, MR*1.5, 20)
         SN_values = [calculate_sn_from_aashto(W18, ZR, So, delta_psi, mr) for mr in MR_range]
         
-        fig_sens = go.Figure()
-        fig_sens.add_trace(go.Scatter(
-            x=MR_range,
-            y=SN_values,
-            mode='lines+markers',
-            name='SN vs MR'
-        ))
-        fig_sens.update_layout(
-            title="Sensitivity: SN vs MR",
-            xaxis_title="Resilient Modulus (psi)",
-            yaxis_title="Structural Number (SN)"
-        )
-        st.plotly_chart(fig_sens, use_container_width=True)
+        if PLOTLY_AVAILABLE:
+            fig_sens = go.Figure()
+            fig_sens.add_trace(go.Scatter(
+                x=MR_range,
+                y=SN_values,
+                mode='lines+markers',
+                name='SN vs MR'
+            ))
+            fig_sens.update_layout(
+                title="Sensitivity: SN vs MR",
+                xaxis_title="Resilient Modulus (psi)",
+                yaxis_title="Structural Number (SN)"
+            )
+            st.plotly_chart(fig_sens, use_container_width=True)
+        else:
+            sens_df = pd.DataFrame({
+                'MR': MR_range,
+                'SN': SN_values
+            })
+            st.line_chart(sens_df.set_index('MR'))
         
     elif sensitivity_param == "Reliability":
         reliability_range = [50, 60, 70, 75, 80, 85, 90, 95, 99]
         ZR_range = [get_reliability_z(r) for r in reliability_range]
         SN_values = [calculate_sn_from_aashto(W18, zr, So, delta_psi, MR) for zr in ZR_range]
         
-        fig_sens = go.Figure()
-        fig_sens.add_trace(go.Scatter(
-            x=reliability_range,
-            y=SN_values,
-            mode='lines+markers',
-            name='SN vs Reliability'
-        ))
-        fig_sens.update_layout(
-            title="Sensitivity: SN vs Reliability",
-            xaxis_title="Reliability (%)",
-            yaxis_title="Structural Number (SN)"
-        )
-        st.plotly_chart(fig_sens, use_container_width=True)
+        if PLOTLY_AVAILABLE:
+            fig_sens = go.Figure()
+            fig_sens.add_trace(go.Scatter(
+                x=reliability_range,
+                y=SN_values,
+                mode='lines+markers',
+                name='SN vs Reliability'
+            ))
+            fig_sens.update_layout(
+                title="Sensitivity: SN vs Reliability",
+                xaxis_title="Reliability (%)",
+                yaxis_title="Structural Number (SN)"
+            )
+            st.plotly_chart(fig_sens, use_container_width=True)
+        else:
+            sens_df = pd.DataFrame({
+                'Reliability': reliability_range,
+                'SN': SN_values
+            })
+            st.line_chart(sens_df.set_index('Reliability'))
     
     # Footer
     st.markdown("---")
